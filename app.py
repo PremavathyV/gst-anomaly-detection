@@ -312,7 +312,7 @@ with tab2:
         .style
         .background_gradient(subset=['risk_score'], cmap='RdYlGn_r', vmin=0, vmax=100)
         .format({'declared_turnover':'₹{:,.0f}', 'risk_score':'{:.1f}'})
-        .applymap(lambda v: 'color:#fc8181;font-weight:600' if '🚨' in str(v)
+        .map(lambda v: 'color:#fc8181;font-weight:600' if '🚨' in str(v)
                   else 'color:#68d391;font-weight:600', subset=['status'])
     )
     st.dataframe(styled, use_container_width=True, height=450)
