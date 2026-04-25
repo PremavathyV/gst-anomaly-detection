@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+data/gst_anomaly_results.csv
+data/audit_priority_list.csv
+data/analysis_charts.png
+data/anomaly_scatter_plots.png
+data/risk_score_bar_chart.png
+data/district_industry_analysis.png
+data/zscore_scatter.png
