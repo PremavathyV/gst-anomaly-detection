@@ -147,24 +147,37 @@ def load_data():
 
 df_raw = pd.read_csv(uploaded_file) if uploaded_file else load_data()
 
-# ── Ensure new columns exist (safe defaults for older datasets) ──
-for col, default in [
-    ('water_consumption', 0.0),
-    ('gstr_mismatch_pct', 0.0),
-    ('eway_bill_count',   0),
-    ('eway_bill_value',   0.0),
-    ('metrowater_id',     'UNKNOWN'),
-]:
-    if col not in df_raw.columns:
-        df_raw[col] = default
-
 # ── Pipeline ──────────────────────────────────────────────────
 @st.cache_data
 def run_pipeline(data, contamination, n_estimators):
     df = data.copy()
-    numeric_cols = ['declared_turnover','electricity_units','employee_count','freight_movement']
+
+    # ── Safe defaults for optional columns ──
+    for col, default in [
+        ('water_consumption',  0.0),
+        ('gstr_mismatch_pct',  0.0),
+        ('eway_bill_count',    0),
+        ('eway_bill_value',    0.0),
+        ('metrowater_id',      'UNKNOWN'),
+        ('audit_outcome',      'NOT_AUDITED'),
+        ('true_evader',        False),
+    ]:
+        if col not in df.columns:
+            df[col] = default
+
+    # ── Ensure nic_code and industry_type exist ──
+    if 'nic_code' not in df.columns:
+        df['nic_code'] = 'UNKNOWN'
+    if 'industry_type' not in df.columns:
+        df['industry_type'] = 'Unknown'
+
+    numeric_cols = ['declared_turnover','electricity_units','employee_count',
+                    'freight_movement','water_consumption','gstr_mismatch_pct',
+                    'eway_bill_count','eway_bill_value']
     for col in numeric_cols:
-        df[col].fillna(df[col].median(), inplace=True)
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+            df[col].fillna(df[col].median(), inplace=True)
 
     df['electricity_to_turnover_ratio'] = df['electricity_units']  / (df['declared_turnover'] + EPSILON)
     df['employees_to_turnover_ratio']   = df['employee_count']     / (df['declared_turnover'] + EPSILON)
