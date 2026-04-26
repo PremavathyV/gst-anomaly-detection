@@ -254,7 +254,7 @@ def run_pipeline(data, contamination, n_estimators):
     df['anomaly_label'] = 1
     df['anomaly_score'] = 0.0
     for nic, grp in df.groupby('nic_code'):
-        if len(grp) < 5: continue
+        if len(grp) < 3: continue
         # Class-imbalance aware contamination
         local_cont = max(0.05, min(0.40, contamination))
         X = StandardScaler().fit_transform(grp[feature_cols].fillna(0))
@@ -328,7 +328,9 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
 with tab1:
     c1, c2 = st.columns(2)
     with c1:
-        dist_risk = df.groupby('district')['risk_score'].mean().reset_index().sort_values('risk_score', ascending=False)
+        dist_risk = df[df['district'] != 'Unknown'].groupby('district')['risk_score'].mean().reset_index().sort_values('risk_score', ascending=False)
+        if dist_risk.empty:
+            dist_risk = df.groupby('district')['risk_score'].mean().reset_index().sort_values('risk_score', ascending=False)
         fig = px.bar(dist_risk, x='district', y='risk_score', color='risk_score',
                      color_continuous_scale='RdYlGn_r', title='Average Risk Score by District',
                      labels={'risk_score':'Avg Risk Score','district':'District'})
@@ -357,8 +359,8 @@ with tab1:
 with tab2:
     st.markdown("### 🚨 Prioritised Audit List")
     filter_opt = st.radio("Filter", ["All", "🚨 Suspicious Only", "✅ Normal Only"], horizontal=True)
-    dist_filter = st.multiselect("Filter by District", sorted(df['district'].unique()), default=[])
-    ind_filter  = st.multiselect("Filter by Industry", sorted(df['industry_type'].unique()), default=[])
+    dist_filter = st.multiselect("Filter by District", sorted(df['district'].dropna().unique()), default=[])
+    ind_filter  = st.multiselect("Filter by Industry", sorted(df['industry_type'].dropna().unique()), default=[])
 
     display = df.copy()
     if "Suspicious" in filter_opt: display = display[display['anomaly_label']==-1]
