@@ -253,15 +253,35 @@ def run_pipeline(data, contamination, n_estimators):
 
     df['anomaly_label'] = 1
     df['anomaly_score'] = 0.0
+
+    # Train per industry if enough data, else train on full dataset
+    trained_indices = []
     for nic, grp in df.groupby('nic_code'):
-        if len(grp) < 3: continue
-        # Class-imbalance aware contamination
+        if len(grp) < 3:
+            continue
         local_cont = max(0.05, min(0.40, contamination))
         X = StandardScaler().fit_transform(grp[feature_cols].fillna(0))
         m = IsolationForest(n_estimators=n_estimators, contamination=local_cont, random_state=42)
         m.fit(X)
         df.loc[grp.index, 'anomaly_label'] = m.predict(X)
         df.loc[grp.index, 'anomaly_score'] = m.score_samples(X)
+        trained_indices.extend(grp.index.tolist())
+
+    # Fallback: train remaining rows (small groups) on full dataset
+    untrained = df.index.difference(trained_indices)
+    if len(untrained) > 0 or len(trained_indices) == 0:
+        fallback_df = df if len(trained_indices) == 0 else df.loc[untrained]
+        if len(fallback_df) >= 2:
+            X_all = StandardScaler().fit_transform(df[feature_cols].fillna(0))
+            m_all = IsolationForest(n_estimators=n_estimators, contamination=contamination, random_state=42)
+            m_all.fit(X_all)
+            if len(trained_indices) == 0:
+                df['anomaly_label'] = m_all.predict(X_all)
+                df['anomaly_score'] = m_all.score_samples(X_all)
+            else:
+                X_unt = StandardScaler().fit_transform(fallback_df[feature_cols].fillna(0))
+                df.loc[untrained, 'anomaly_label'] = m_all.predict(X_unt)
+                df.loc[untrained, 'anomaly_score'] = m_all.score_samples(X_unt)
 
     raw = df['anomaly_score']
     df['risk_score'] = (100*(1-(raw-raw.min())/(raw.max()-raw.min()+EPSILON))).round(2)
