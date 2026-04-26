@@ -165,19 +165,67 @@ def run_pipeline(data, contamination, n_estimators):
         if col not in df.columns:
             df[col] = default
 
+    # ── Column name aliases (handle different naming conventions) ──
+    col_aliases = {
+        'turnover':           'declared_turnover',
+        'declared_turnover':  'declared_turnover',
+        'electricity':        'electricity_units',
+        'electricity_units':  'electricity_units',
+        'employees':          'employee_count',
+        'employee_count':     'employee_count',
+        'freight':            'freight_movement',
+        'freight_movement':   'freight_movement',
+        'water':              'water_consumption',
+        'water_consumption':  'water_consumption',
+        'gstr_mismatch':      'gstr_mismatch_pct',
+        'gstr_mismatch_pct':  'gstr_mismatch_pct',
+        'eway_value':         'eway_bill_value',
+        'eway_bill_value':    'eway_bill_value',
+        'eway_count':         'eway_bill_count',
+        'eway_bill_count':    'eway_bill_count',
+        'gstin':              'gstin',
+        'business':           'business_name',
+        'business_name':      'business_name',
+        'district':           'district',
+        'industry':           'industry_type',
+        'industry_type':      'industry_type',
+        'nic':                'nic_code',
+        'nic_code':           'nic_code',
+    }
+    df.columns = [col_aliases.get(c.lower().strip(), c.lower().strip()) for c in df.columns]
+
     # ── Ensure nic_code and industry_type exist ──
     if 'nic_code' not in df.columns:
         df['nic_code'] = 'UNKNOWN'
     if 'industry_type' not in df.columns:
         df['industry_type'] = 'Unknown'
+    if 'business_name' not in df.columns:
+        df['business_name'] = df.get('gstin', pd.Series(range(len(df)))).astype(str)
+    if 'gstin' not in df.columns:
+        df['gstin'] = ['BIZ' + str(i).zfill(3) for i in range(len(df))]
+    if 'district' not in df.columns:
+        df['district'] = 'Unknown'
+
+    # ── Safe defaults for ALL required numeric columns ──
+    for col, default in [
+        ('declared_turnover',  0.0),
+        ('electricity_units',  0.0),
+        ('employee_count',     0.0),
+        ('freight_movement',   0.0),
+        ('water_consumption',  0.0),
+        ('gstr_mismatch_pct',  0.0),
+        ('eway_bill_count',    0.0),
+        ('eway_bill_value',    0.0),
+    ]:
+        if col not in df.columns:
+            df[col] = default
 
     numeric_cols = ['declared_turnover','electricity_units','employee_count',
                     'freight_movement','water_consumption','gstr_mismatch_pct',
                     'eway_bill_count','eway_bill_value']
     for col in numeric_cols:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-            df[col].fillna(df[col].median(), inplace=True)
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+        df[col].fillna(df[col].median() if df[col].notna().any() else 0, inplace=True)
 
     df['electricity_to_turnover_ratio'] = df['electricity_units']  / (df['declared_turnover'] + EPSILON)
     df['employees_to_turnover_ratio']   = df['employee_count']     / (df['declared_turnover'] + EPSILON)
